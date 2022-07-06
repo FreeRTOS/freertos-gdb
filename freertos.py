@@ -38,7 +38,7 @@ class TaskLists(enum.Enum):
 #The variables of the TCB_t to display.
 class TaskVariables(enum.Enum):
   PRIORITY = ('uxPriority', 'get_int_var')
-  STACK = ('pxStack', 'get_int_var') #get hex var
+  STACK = ('pxStack', 'get_hex_var')
   NAME = ('pcTaskName', 'get_string_var')
   #MUTEXES = ('uxMutexesHeld', 'get_int_var')
 
@@ -46,11 +46,14 @@ class TaskVariables(enum.Enum):
     self.var_name = var_name
     self.get_var_fn = getattr(self, get_var_fn)
 
-  def get_string_var(self, tcb):
-    return tcb[self.var_name].string()
-
   def get_int_var(self, tcb):
     return int(tcb[self.var_name])
+
+  def get_hex_var(self, tcb):
+    return hex(int(tcb[self.var_name]))
+
+  def get_string_var(self, tcb):
+    return tcb[self.var_name].string()
 
 #TODO: consider multiple current tasks, could this happen in a multiprocessor?
 def get_current_tcb():
