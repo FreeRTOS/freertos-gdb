@@ -1,3 +1,5 @@
+# These commands must only be used after pxCurrentTCB is initialized.
+
 import enum
 import gdb
 
@@ -35,8 +37,10 @@ class TaskLists(enum.Enum):
 
 #The variables of the TCB_t to display.
 class TaskVariables(enum.Enum):
-  NAME = ('pcTaskName', 'get_string_var')
   PRIORITY = ('uxPriority', 'get_int_var')
+  STACK = ('pxStack', 'get_int_var') #get hex var
+  NAME = ('pcTaskName', 'get_string_var')
+  #MUTEXES = ('uxMutexesHeld', 'get_int_var')
 
   def __init__(self, var_name, get_var_fn):
     self.var_name = var_name
@@ -84,6 +88,10 @@ class FreeRTOSTaskInfo(gdb.Command):
     super (FreeRTOSTaskInfo, self).__init__ ("freertos tasks", gdb.COMMAND_NONE)
 
   def invoke (self, arg, from_tty):
+    if gdb.parse_and_eval('uxCurrentNumberOfTasks') == 0:
+      print ("There are currently no tasks. The program may not have created any tasks.")
+      return
+
     table = []
 
     for tasklist_type in TaskLists:
