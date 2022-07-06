@@ -3,6 +3,8 @@
 import enum
 import gdb
 
+from tabulate import tabulate
+
 #Python representation of List_t in FreeRTOS.
 class FreeRTOSList():
     def __init__(self, list_, cast_type_str):
@@ -79,8 +81,9 @@ def tasklist_to_rows(tasklist):
 
   return rows
 
-def print_table():
-  return 5
+#table is given as an array of rows. Each row is an array of elements.
+def print_table(table):
+  print (tabulate(table, headers=[taskvar.name for taskvar in TaskVariables]))
 
 class FreeRTOS(gdb.Command):
     def __init__(self):
@@ -113,8 +116,7 @@ class FreeRTOSTaskInfo(gdb.Command):
       print ("There are currently no tasks. The program may not have created any tasks yet.")
       return
 
-    #TODO: some fancier printing function
-    print(table)
+    print_table(table)
 
 FreeRTOS()
 FreeRTOSTaskInfo()
