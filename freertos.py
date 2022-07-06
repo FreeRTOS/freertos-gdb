@@ -25,19 +25,21 @@ class FreeRTOSList():
 
 #All FreeRTOS task lists to display tasks from. Does not include any currently running tasks.
 class TaskLists(enum.Enum):
-  READY = 'pxReadyTasksLists' #Ready
+  READY = ('pxReadyTasksLists', 'R') #Ready
   #TODO: not supposed to be accesssed unless in critical section?
   #This list is not shown in vTaskList, so we might not want to show it here either?
   #PEND_READ = 'xPendingReadyList' 
-  SUSPENDED = 'xSuspendedTaskList' #Suspended
-  DELAYED_1 = 'xDelayedTaskList1' #Blocked
-  DELAYED_2 = 'xDelayedTaskList2' #Blocked
-  WAIT_TERM = 'xTasksWaitingTermination' #Deleted
+  SUSPENDED = ('xSuspendedTaskList', 'S') #Suspended
+  DELAYED_1 = ('xDelayedTaskList1', 'B') #Blocked
+  DELAYED_2 = ('xDelayedTaskList2', 'B') #Blocked
+  WAIT_TERM = ('xTasksWaitingTermination', 'D') #Deleted (awaiting cleanup)
 
-  def __init__(self, symbol):
+  def __init__(self, symbol, state):
     self.symbol = symbol
+    self.state = state
 
 #The variables of the TCB_t to display.
+#The task's state is determined elsewhere, as they are not directly read off tcb
 class TaskVariables(enum.Enum):
   PRIORITY = ('uxPriority', 'get_int_var')
   STACK = ('pxStack', 'get_hex_var')
@@ -63,17 +65,18 @@ def get_current_tcb():
   return current_tcb
 
 #Takes a task list List_t as a gdb.Value. Returns an array of arrays, each subarray has the contents of the TCB
-def tasklist_to_rows(tasklist):
+def tasklist_to_rows(tasklist, state):
   rows = []
-  freertos_list = FreeRTOSList(tasklist, 'TCB_t')
+  pythonic_list = FreeRTOSList(tasklist, 'TCB_t')
 
-  for task_ptr in freertos_list:
+  for task_ptr in pythonic_list:
     if task_ptr == 0:
       print("Task pointer is NULL. Stack corruption?")
     
     row = []
     task_tcb = task_ptr.referenced_value()
     
+    row.append(state)
     for tcb_var in TaskVariables:
       row.append(tcb_var.get_var_fn(task_tcb))
 
@@ -83,7 +86,7 @@ def tasklist_to_rows(tasklist):
 
 #table is given as an array of rows. Each row is an array of elements.
 def print_table(table):
-  print (tabulate(table, headers=[taskvar.name for taskvar in TaskVariables]))
+  print (tabulate(table, headers=(["STATE"] + [taskvar.name for taskvar in TaskVariables])))
 
 class FreeRTOS(gdb.Command):
     def __init__(self):
@@ -99,18 +102,16 @@ class FreeRTOSTaskInfo(gdb.Command):
   def invoke (self, arg, from_tty):
     table = []
 
-    for tasklist_type in TaskLists:
-      tasklist_val = gdb.parse_and_eval(tasklist_type.symbol)
+    for tasklist in TaskLists:
+      tasklist_val = gdb.parse_and_eval(tasklist.symbol)
 
       if tasklist_val.type.code == gdb.TYPE_CODE_ARRAY:
         #only used for pxReadyTaskLists, because it has a list for every priority.
         r = tasklist_val.type.range()
         for i in range(r[0], r[1] + 1):
-          rows = tasklist_to_rows(tasklist_val[i])
-          table.extend(rows)
+          table.extend(tasklist_to_rows(tasklist_val[i], tasklist.state))
       else:
-        rows = tasklist_to_rows(tasklist_val)
-        table.extend(rows)
+        table.extend(tasklist_to_rows(tasklist_val, tasklist.state))
 
     if len(table) == 0:
       print ("There are currently no tasks. The program may not have created any tasks yet.")
