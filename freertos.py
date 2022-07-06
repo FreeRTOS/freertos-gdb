@@ -26,9 +26,6 @@ class FreeRTOSList():
 #All FreeRTOS task lists to display tasks from. Does not include any currently running tasks.
 class TaskLists(enum.Enum):
   READY = ('pxReadyTasksLists', 'R') #Ready
-  #TODO: not supposed to be accesssed unless in critical section?
-  #This list is not shown in vTaskList, so we might not want to show it here either?
-  #PEND_READ = 'xPendingReadyList' 
   SUSPENDED = ('xSuspendedTaskList', 'S') #Suspended
   DELAYED_1 = ('xDelayedTaskList1', 'B') #Blocked
   DELAYED_2 = ('xDelayedTaskList2', 'B') #Blocked
@@ -39,25 +36,33 @@ class TaskLists(enum.Enum):
     self.state = state
 
 #The variables of the TCB_t to display.
-#The task's state and CPU is determined elsewhere, as they are not directly read off tcb
+#Refer to FreeRTOS' task.c file for documentation
 class TaskVariables(enum.Enum):
-  PRIORITY = ('uxPriority', 'get_int_var')
-  STACK = ('pxStack', 'get_hex_var')
-  NAME = ('pcTaskName', 'get_string_var')
-  #MUTEXES = ('uxMutexesHeld', 'get_int_var')
+  PRIORITY = ('uxPriority', 'get_int_var', '')
+  STACK = ('pxStack', 'get_hex_var', '')
+  NAME = ('pcTaskName', 'get_string_var', '')
+  STACK_END = ('pxEndOfStack', 'get_hex_var', 'configRECORD_STACK_HIGH_ADDRESS')
+  CRITICAL_NESTING = ('uxCriticalNesting', 'get_int_var', 'portCRITICAL_NESTING_IN_TCB')
+  TCB_NUM = ('uxTCBNumber', 'get_int_var', 'configUSE_TRACE_FACILITY')
+  MUTEXES = ('uxMutexesHeld', 'get_int_var', 'configUSE_MUTEXES')
+  RUN_TIME = ('ulRunTimeCounter', 'get_int_var', 'configGENERATE_RUN_TIME_STATS')
 
-  def __init__(self, var_name, get_var_fn):
-    self.var_name = var_name
+  def __init__(self, symbol, get_var_fn, config_check):
+    self.symbol = symbol
     self.get_var_fn = getattr(self, get_var_fn)
+    self.config_check = config_check
+
+  def is_valid(self):
+    return (self.config_check == '' or gdb.parse_and_eval(self.config_check))
 
   def get_int_var(self, tcb):
-    return int(tcb[self.var_name])
+    return int(tcb[self.symbol])
 
   def get_hex_var(self, tcb):
-    return hex(int(tcb[self.var_name]))
+    return hex(int(tcb[self.symbol]))
 
   def get_string_var(self, tcb):
-    return tcb[self.var_name].string()
+    return tcb[self.symbol].string()
 
 def get_current_tcbs():
   current_tcb_arr = []
@@ -85,21 +90,32 @@ def tasklist_to_rows(tasklist, state, current_tcbs):
     row = []
     task_tcb = task_ptr.referenced_value()
     
+    row.append(str(task_ptr))
     row.append(state)
     if task_ptr in current_tcbs:
       row.append(current_tcbs.index(task_ptr))
     else:
       row.append('')
     for tcb_var in TaskVariables:
-      row.append(tcb_var.get_var_fn(task_tcb))
+      if tcb_var.is_valid():
+        row.append(tcb_var.get_var_fn(task_tcb))
 
     rows.append(row)
 
   return rows
 
+def get_header():
+  headers = ["ID", "STATE", "CPU"]
+
+  for taskvar in TaskVariables:
+    if taskvar.is_valid():
+      headers.append(taskvar.name)
+
+  return headers
+
 #table is given as an array of rows. Each row is an array of elements.
 def print_table(table):
-  print (tabulate(table, headers=(["STATE", "CPU"] + [taskvar.name for taskvar in TaskVariables])))
+  print (tabulate(table, headers=get_header()))
 
 class FreeRTOS(gdb.Command):
     def __init__(self):
