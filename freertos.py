@@ -1,5 +1,7 @@
-# These commands must only be used after pxCurrentTCB is initialized.
-# Task-specific breakpoint may have undefined behaviour in multiprocess environments.
+"""
+These commands must only be used after pxCurrentTCB is initialized.
+Task-specific breakpoint may have undefined behaviour in multiprocess environments.
+"""
 
 import enum
 import gdb
@@ -24,11 +26,12 @@ class FreeRTOSList():
         """
         Parameters
         ----------
-        freertos_list : gdb.value
+        freertos_list : gdb.value (List_t)
             An inferior variable of type List_t whose data to use.
         cast_type_str : str
             The type of objects that own each ListItem_t in the list.
         """
+
         self.uxNumberOfItems = freertos_list['uxNumberOfItems']
         self.pxIndex = freertos_list['pxIndex']
         self.xListEnd = freertos_list['xListEnd']
@@ -57,6 +60,7 @@ class TaskLists(enum.Enum):
         'D' - Deleted (waiting clean up)
         'S' - Suspended, or Blocked without a timeout
     """
+
     READY = ('pxReadyTasksLists', 'R')
     SUSPENDED = ('xSuspendedTaskList', 'S')
     DELAYED_1 = ('xDelayedTaskList1', 'B')
@@ -67,10 +71,21 @@ class TaskLists(enum.Enum):
         self.symbol = symbol
         self.state = state
 
-#The variables of the TCB_t to display.
-#Refer to FreeRTOS' task.c file for documentation
 class TaskVariables(enum.Enum):
-    """Variables of TCB_t to display"""
+    """Variables of TCB_t to display. Refer to FreeRTOS' task.c file for
+       more documentation.
+
+    Parameters
+    ----------
+    symbol : str
+        The name of the variable in TCB_t.
+    get_var_fn: str
+        A function to get the variable as a gdb.value, then cast it to the
+        appropriate Python type.
+    config_check: str, optional
+        The config define to check if the variable is enabled.
+    """
+
     PRIORITY = ('uxPriority', 'get_int_var', '')
     STACK = ('pxStack', 'get_hex_var', '')
     NAME = ('pcTaskName', 'get_string_var', '')
@@ -86,7 +101,8 @@ class TaskVariables(enum.Enum):
         self.config_check = config_check
 
     def is_valid(self):
-        return (self.config_check == '' or gdb.parse_and_eval(self.config_check))
+        return (self.config_check == '' 
+                or gdb.parse_and_eval(self.config_check))
 
     def get_int_var(self, tcb):
         return int(tcb[self.symbol])
@@ -98,113 +114,136 @@ class TaskVariables(enum.Enum):
         return tcb[self.symbol].string()
 
 def get_current_tcbs():
-  current_tcb_arr = []
-  
-  current_tcb = gdb.parse_and_eval('pxCurrentTCB')
+    """Returns a list of the currently running tasks. The elements are
+       gdb.values with inferior type (TCB_t *)."""
 
-  if current_tcb.type.code == gdb.TYPE_CODE_ARRAY:
-    r = current_tcb.type.range()
-    for i in range(r[0], r[1] + 1):
-      current_tcb_arr.append(current_tcb[i])
-  else:
-    current_tcb_arr.append(current_tcb)
-  
-  return current_tcb_arr
+    current_tcb_arr = []
+    
+    current_tcb = gdb.parse_and_eval('pxCurrentTCB')
+
+    if current_tcb.type.code == gdb.TYPE_CODE_ARRAY:
+        r = current_tcb.type.range()
+        for i in range(r[0], r[1] + 1):
+            current_tcb_arr.append(current_tcb[i])
+    else:
+        current_tcb_arr.append(current_tcb)
+    
+    return current_tcb_arr
 
 #Takes a task list List_t as a gdb.Value. Returns an array of arrays, each subarray has the contents of the TCB
 def tasklist_to_rows(tasklist, state, current_tcbs):
-  rows = []
-  pythonic_list = FreeRTOSList(tasklist, 'TCB_t')
-
-  for task_ptr in pythonic_list:
-    if task_ptr == 0:
-      print("Task pointer is NULL. Stack corruption?")
+    """Parses a task list into rows that can be displayed.
     
-    row = []
-    task_tcb = task_ptr.referenced_value()
+    Parameters
+    ----------
+    tasklist : gdb.value (List_t)
+    state : str
+    current_tcbs : list of gdb.value (TCB_t *)
+
+    Returns
+    -------
+    rows : list of lists
+        Each element is a list containing information to display for a task.
+    """
+
+    rows = []
+    pythonic_list = FreeRTOSList(tasklist, 'TCB_t')
+
+    for task_ptr in pythonic_list:
+        if task_ptr == 0:
+            print("Task pointer is NULL. Stack corruption?")
     
-    row.append(str(task_ptr))
-    row.append(state)
-    if task_ptr in current_tcbs:
-      row.append(current_tcbs.index(task_ptr))
-    else:
-      row.append('')
-    for tcb_var in TaskVariables:
-      if tcb_var.is_valid():
-        row.append(tcb_var.get_var_fn(task_tcb))
+        row = []
+        task_tcb = task_ptr.referenced_value()
+    
+        row.append(str(task_ptr))
+        row.append(state)
+        if task_ptr in current_tcbs:
+            row.append(current_tcbs.index(task_ptr))
+        else:
+            row.append('')
+        for tcb_var in TaskVariables:
+            if tcb_var.is_valid():
+                row.append(tcb_var.get_var_fn(task_tcb))
+        
+        rows.append(row)
 
-    rows.append(row)
-
-  return rows
+    return rows
 
 def get_header():
-  headers = ["ID", "STATE", "CPU"]
+    """Returns table headers describing each piece of task info."""
 
-  for taskvar in TaskVariables:
-    if taskvar.is_valid():
-      headers.append(taskvar.name)
+    headers = ["ID", "STATE", "CPU"]
 
-  return headers
+    for taskvar in TaskVariables:
+        if taskvar.is_valid():
+            headers.append(taskvar.name)
 
-#table is given as an array of rows. Each row is an array of elements.
+    return headers
+
 def print_table(table):
-  print (tabulate(table, headers=get_header()))
+    """Takes a list of lists and prints it in a formatted table."""
+    print (tabulate(table, headers=get_header()))
 
 class FreeRTOSBreakpoint (gdb.Breakpoint):
-  def __init__(self, task_name, spec):
-    self.task_name = task_name
-    super(FreeRTOSBreakpoint, self).__init__(spec)
+    def __init__(self, task_name, spec):
+        self.task_name = task_name
+        super(FreeRTOSBreakpoint, self).__init__(spec)
 
-  def stop (self):
-    current_task_names = [tcb['pcTaskName'].string() for tcb in get_current_tcbs()]
-    return self.task_name in current_task_names
+    def stop (self):
+        current_task_names = [tcb['pcTaskName'].string() for tcb in get_current_tcbs()]
+        return self.task_name in current_task_names
 
 class FreeRTOS(gdb.Command):
     def __init__(self):
         super(FreeRTOS, self).__init__('freertos', gdb.COMMAND_USER, gdb.COMPLETE_NONE, True)
 
 class FreeRTOSTaskInfo(gdb.Command):
-  """Shows FreeRTOS tasks"""
+    """Displays FreeRTOS tasks and information."""
   
-  def __init__ (self):
-    super (FreeRTOSTaskInfo, self).__init__ ("freertos tasks", gdb.COMMAND_USER)
+    def __init__ (self):
+        super (FreeRTOSTaskInfo, self).__init__ ("freertos tasks", gdb.COMMAND_USER)
 
-  def invoke (self, arg, from_tty):
-    table = []
-    current_tcbs = get_current_tcbs()
+    def invoke (self, arg, from_tty):
+        table = []
+        current_tcbs = get_current_tcbs()
 
-    for tasklist in TaskLists:
-      tasklist_val = gdb.parse_and_eval(tasklist.symbol)
+        for tasklist in TaskLists:
+            tasklist_val = gdb.parse_and_eval(tasklist.symbol)
 
-      if tasklist_val.type.code == gdb.TYPE_CODE_ARRAY:
-        #only used for pxReadyTaskLists, because it has a list for every priority.
-        r = tasklist_val.type.range()
-        for i in range(r[0], r[1] + 1):
-          table.extend(tasklist_to_rows(tasklist_val[i], tasklist.state, current_tcbs))
-      else:
-        table.extend(tasklist_to_rows(tasklist_val, tasklist.state, current_tcbs))
+            if tasklist_val.type.code == gdb.TYPE_CODE_ARRAY:
+                #only used for pxReadyTaskLists, because it has a list for every priority.
+                r = tasklist_val.type.range()
+                for i in range(r[0], r[1] + 1):
+                    table.extend(tasklist_to_rows(tasklist_val[i], tasklist.state, current_tcbs))
+            else:
+                table.extend(tasklist_to_rows(tasklist_val, tasklist.state, current_tcbs))
 
-    if len(table) == 0:
-      print ("There are currently no tasks. The program may not have created any tasks yet.")
-      return
+        if len(table) == 0:
+            print ("There are currently no tasks. The program may not have "
+                   "created any tasks yet.")
+            return
 
-    print_table(table)
+        print_table(table)
 
 class FreeRTOSCreateBreakpoint(gdb.Command):
-  def __init__(self):
-    super (FreeRTOSCreateBreakpoint, self).__init__ ("freertos break", gdb.COMMAND_USER)
+    """Create a breakpoint that will only get tripped by the specific task."""
 
-  def invoke (self, arg, from_tty):
-    argv = gdb.string_to_argv(arg)
+    def __init__(self):
+        super (FreeRTOSCreateBreakpoint, self).__init__ ("freertos break", gdb.COMMAND_USER)
 
-    if len(argv) == 0:
-      print ("No arguments given. Must have 2 arguments in order of \"target_task target_function\".")
-      return
+    def invoke (self, arg, from_tty):
+        argv = gdb.string_to_argv(arg)
 
-    target_task = argv[0]
-    target_function = argv[1]
+        if len(argv) == 0:
+            print ("No arguments given. Must have 2 arguments in "
+                   "order of \"target_task target_location\".")
+            return
 
-    FreeRTOSBreakpoint(target_task, target_function)
+        target_task = argv[0]
+        target_function = argv[1]
+
+        FreeRTOSBreakpoint(target_task, target_function)
 
 FreeRTOS()
 FreeRTOSTaskInfo()
