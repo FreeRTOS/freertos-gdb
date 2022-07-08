@@ -13,10 +13,10 @@ class FreeRTOSList():
 
     Parameters
     ----------
-    uxNumberOfItems : gdb.Value (UBaseType_t)
-    pxIndex : gdb.Value (ListItem_t *)
-    xListEnd : gdb.Value (MiniListItem_t)
-    head : gdb.Value (xLIST_ITEM *)
+    uxNumberOfItems : gdb.value (UBaseType_t)
+    pxIndex : gdb.value (ListItem_t *)
+    xListEnd : gdb.value (MiniListItem_t)
+    head : gdb.value (xLIST_ITEM *)
         Pointer to first item in the list.
     cast_type : gdb.Type
         Type of the objects owning items in the list.
@@ -26,9 +26,9 @@ class FreeRTOSList():
         """
         Parameters
         ----------
-        freertos_list : gdb.Value (List_t)
+        freertos_list : gdb.value (List_t)
             An inferior variable of type List_t whose data to use.
-        cast_type : str
+        cast_type_str : str
             The type of objects that own each ListItem_t in the list.
         """
 
@@ -79,8 +79,8 @@ class TaskVariables(enum.Enum):
     ----------
     symbol : str
         The name of the variable in TCB_t.
-    get_var_fn: callable
-        A function to get the variable as a gdb.Value, then cast it to the
+    get_var_fn: str
+        A function to get the variable as a gdb.value, then cast it to the
         appropriate Python type.
     config_check: str, optional
         The config define to check if the variable is enabled.
@@ -115,7 +115,7 @@ class TaskVariables(enum.Enum):
 
 def get_current_tcbs():
     """Returns a list of the currently running tasks. The elements are
-       gdb.Values with inferior type (TCB_t *)."""
+       gdb.values with inferior type (TCB_t *)."""
 
     current_tcb_arr = []
     
@@ -135,9 +135,9 @@ def tasklist_to_rows(tasklist, state, current_tcbs):
     
     Parameters
     ----------
-    tasklist : gdb.Value (List_t)
+    tasklist : gdb.value (List_t)
     state : str
-    current_tcbs : list of gdb.Value (TCB_t *)
+    current_tcbs : list of gdb.value (TCB_t *)
 
     Returns
     -------
