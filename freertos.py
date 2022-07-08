@@ -244,3 +244,4 @@ class FreeRTOSCreateBreakpoint(gdb.Command):
 FreeRTOS()
 FreeRTOSTaskInfo()
 FreeRTOSCreateBreakpoint()
+
