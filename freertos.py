@@ -117,18 +117,18 @@ def get_current_tcbs():
     """Returns a list of the currently running tasks. The elements are
        gdb.Values with inferior type (TCB_t *)."""
 
-    current_tcb_arr = []
+    current_tcbs_arr = []
     
-    current_tcb = gdb.parse_and_eval('pxCurrentTCB')
+    current_tcbs = gdb.parse_and_eval('pxCurrentTCB')
 
-    if current_tcb.type.code == gdb.TYPE_CODE_ARRAY:
-        r = current_tcb.type.range()
-        for i in range(r[0], r[1] + 1):
-            current_tcb_arr.append(current_tcb[i])
+    if current_tcbs.type.code == gdb.TYPE_CODE_ARRAY:
+        cpus = current_tcbs.type.range()
+        for cpu in range(cpus[0], cpus[1] + 1):
+            current_tcbs_arr.append(current_tcbs[cpu])
     else:
-        current_tcb_arr.append(current_tcb)
+        current_tcbs_arr.append(current_tcbs)
     
-    return current_tcb_arr
+    return current_tcbs_arr
 
 def tasklist_to_rows(tasklist, state, current_tcbs):
     """Parses a task list into rows that can be displayed.
@@ -180,10 +180,6 @@ def get_header():
 
     return headers
 
-def print_table(table):
-    """Takes a list of lists and prints it in a formatted table."""
-    print (tabulate(table, headers=get_header()))
-
 class FreeRTOSBreakpoint (gdb.Breakpoint):
     def __init__(self, task_name, spec):
         self.task_name = task_name
@@ -212,9 +208,9 @@ class FreeRTOSTaskInfo(gdb.Command):
 
             if tasklist_val.type.code == gdb.TYPE_CODE_ARRAY:
                 #only used for pxReadyTaskLists, because it has a list for every priority.
-                r = tasklist_val.type.range()
-                for i in range(r[0], r[1] + 1):
-                    table.extend(tasklist_to_rows(tasklist_val[i], tasklist.state, current_tcbs))
+                priorities = tasklist_val.type.range()
+                for priority in range(priorities[0], priorities[1] + 1):
+                    table.extend(tasklist_to_rows(tasklist_val[priority], tasklist.state, current_tcbs))
             else:
                 table.extend(tasklist_to_rows(tasklist_val, tasklist.state, current_tcbs))
 
@@ -223,7 +219,7 @@ class FreeRTOSTaskInfo(gdb.Command):
                    "created any tasks yet.")
             return
 
-        print_table(table)
+        print (tabulate(table, headers=get_header()))
 
 class FreeRTOSCreateBreakpoint(gdb.Command):
     """Create a breakpoint that will only get tripped by the specific task."""
