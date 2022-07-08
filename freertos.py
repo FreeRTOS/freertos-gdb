@@ -6,6 +6,7 @@ Task-specific breakpoint may have undefined behaviour in multiprocess environmen
 import enum
 import gdb
 
+from typing import Any
 from tabulate import tabulate
 
 class FreeRTOSList():
@@ -13,22 +14,22 @@ class FreeRTOSList():
 
     Parameters
     ----------
-    uxNumberOfItems : gdb.value (UBaseType_t)
-    pxIndex : gdb.value (ListItem_t *)
-    xListEnd : gdb.value (MiniListItem_t)
-    head : gdb.value (xLIST_ITEM *)
+    uxNumberOfItems : gdb.Value (UBaseType_t)
+    pxIndex : gdb.Value (ListItem_t *)
+    xListEnd : gdb.Value (MiniListItem_t)
+    head : gdb.Value (xLIST_ITEM *)
         Pointer to first item in the list.
     cast_type : gdb.Type
         Type of the objects owning items in the list.
     """
 
-    def __init__(self, freertos_list, cast_type_str):
+    def __init__(self, freertos_list : gdb.Value, cast_type_str : str):
         """
         Parameters
         ----------
-        freertos_list : gdb.value (List_t)
+        freertos_list : gdb.Value (List_t)
             An inferior variable of type List_t whose data to use.
-        cast_type_str : str
+        cast_type : str
             The type of objects that own each ListItem_t in the list.
         """
 
@@ -67,7 +68,7 @@ class TaskLists(enum.Enum):
     DELAYED_2 = ('xDelayedTaskList2', 'B')
     WAIT_TERM = ('xTasksWaitingTermination', 'D')
 
-    def __init__(self, symbol, state):
+    def __init__(self, symbol : str, state : str):
         self.symbol = symbol
         self.state = state
 
@@ -79,8 +80,8 @@ class TaskVariables(enum.Enum):
     ----------
     symbol : str
         The name of the variable in TCB_t.
-    get_var_fn: str
-        A function to get the variable as a gdb.value, then cast it to the
+    get_var_fn: callable
+        A function to get the variable as a gdb.Value, then cast it to the
         appropriate Python type.
     config_check: str, optional
         The config define to check if the variable is enabled.
@@ -95,27 +96,27 @@ class TaskVariables(enum.Enum):
     MUTEXES = ('uxMutexesHeld', 'get_int_var', 'configUSE_MUTEXES')
     RUN_TIME = ('ulRunTimeCounter', 'get_int_var', 'configGENERATE_RUN_TIME_STATS')
 
-    def __init__(self, symbol, get_var_fn, config_check):
+    def __init__(self, symbol : str, get_var_fn_str : str, config_check : str):
         self.symbol = symbol
-        self.get_var_fn = getattr(self, get_var_fn)
+        self.get_var_fn = getattr(self, get_var_fn_str)
         self.config_check = config_check
 
     def is_valid(self):
         return (self.config_check == '' 
                 or gdb.parse_and_eval(self.config_check))
 
-    def get_int_var(self, tcb):
+    def get_int_var(self, tcb : gdb.Value):
         return int(tcb[self.symbol])
 
-    def get_hex_var(self, tcb):
+    def get_hex_var(self, tcb : gdb.Value):
         return hex(int(tcb[self.symbol]))
 
-    def get_string_var(self, tcb):
+    def get_string_var(self, tcb : gdb.Value):
         return tcb[self.symbol].string()
 
 def get_current_tcbs():
     """Returns a list of the currently running tasks. The elements are
-       gdb.values with inferior type (TCB_t *)."""
+       gdb.Values with inferior type (TCB_t *)."""
 
     current_tcb_arr = []
     
@@ -130,15 +131,14 @@ def get_current_tcbs():
     
     return current_tcb_arr
 
-#Takes a task list List_t as a gdb.Value. Returns an array of arrays, each subarray has the contents of the TCB
-def tasklist_to_rows(tasklist, state, current_tcbs):
+def tasklist_to_rows(tasklist : gdb.Value, state : str, current_tcbs : list[gdb.Value]):
     """Parses a task list into rows that can be displayed.
     
     Parameters
     ----------
-    tasklist : gdb.value (List_t)
+    tasklist : gdb.Value (List_t)
     state : str
-    current_tcbs : list of gdb.value (TCB_t *)
+    current_tcbs : list of gdb.Value (TCB_t *)
 
     Returns
     -------
@@ -181,12 +181,12 @@ def get_header():
 
     return headers
 
-def print_table(table):
+def print_table(table : list[list[Any]]):
     """Takes a list of lists and prints it in a formatted table."""
     print (tabulate(table, headers=get_header()))
 
 class FreeRTOSBreakpoint (gdb.Breakpoint):
-    def __init__(self, task_name, spec):
+    def __init__(self, task_name : str, spec : str):
         self.task_name = task_name
         super(FreeRTOSBreakpoint, self).__init__(spec)
 
@@ -204,7 +204,7 @@ class FreeRTOSTaskInfo(gdb.Command):
     def __init__ (self):
         super (FreeRTOSTaskInfo, self).__init__ ("freertos tasks", gdb.COMMAND_USER)
 
-    def invoke (self, arg, from_tty):
+    def invoke (self, arg : str, from_tty : bool):
         table = []
         current_tcbs = get_current_tcbs()
 
@@ -232,7 +232,7 @@ class FreeRTOSCreateBreakpoint(gdb.Command):
     def __init__(self):
         super (FreeRTOSCreateBreakpoint, self).__init__ ("freertos break", gdb.COMMAND_USER)
 
-    def invoke (self, arg, from_tty):
+    def invoke (self, arg : str, from_tty : bool):
         argv = gdb.string_to_argv(arg)
 
         if len(argv) == 0:
