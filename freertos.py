@@ -195,7 +195,7 @@ class FreeRTOSBreakpoint (gdb.Breakpoint):
 
 class FreeRTOS(gdb.Command):
     def __init__(self):
-        super(FreeRTOS, self).__init__('freertos', gdb.COMMAND_USER, gdb.COMPLETE_NONE, True)
+        super(FreeRTOS, self).__init__('freertos', gdb.COMMAND_USER, gdb.COMPLETE_COMMAND, True)
 
 class FreeRTOSTaskInfo(gdb.Command):
     """Displays FreeRTOS tasks and information."""
@@ -229,7 +229,7 @@ class FreeRTOSCreateBreakpoint(gdb.Command):
     """Create a breakpoint that will only get tripped by the specific task."""
 
     def __init__(self):
-        super (FreeRTOSCreateBreakpoint, self).__init__ ("freertos break", gdb.COMMAND_USER)
+        super (FreeRTOSCreateBreakpoint, self).__init__ ("freertos break", gdb.COMMAND_USER, gdb.COMPLETE_SYMBOL)
 
     def invoke (self, arg, from_tty):
         argv = gdb.string_to_argv(arg)
