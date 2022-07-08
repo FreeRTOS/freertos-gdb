@@ -6,7 +6,6 @@ Task-specific breakpoint may have undefined behaviour in multiprocess environmen
 import enum
 import gdb
 
-from typing import Any
 from tabulate import tabulate
 
 class FreeRTOSList():
@@ -23,7 +22,7 @@ class FreeRTOSList():
         Type of the objects owning items in the list.
     """
 
-    def __init__(self, freertos_list : gdb.Value, cast_type_str : str):
+    def __init__(self, freertos_list, cast_type_str):
         """
         Parameters
         ----------
@@ -68,7 +67,7 @@ class TaskLists(enum.Enum):
     DELAYED_2 = ('xDelayedTaskList2', 'B')
     WAIT_TERM = ('xTasksWaitingTermination', 'D')
 
-    def __init__(self, symbol : str, state : str):
+    def __init__(self, symbol, state):
         self.symbol = symbol
         self.state = state
 
@@ -96,7 +95,7 @@ class TaskVariables(enum.Enum):
     MUTEXES = ('uxMutexesHeld', 'get_int_var', 'configUSE_MUTEXES')
     RUN_TIME = ('ulRunTimeCounter', 'get_int_var', 'configGENERATE_RUN_TIME_STATS')
 
-    def __init__(self, symbol : str, get_var_fn_str : str, config_check : str):
+    def __init__(self, symbol, get_var_fn_str, config_check):
         self.symbol = symbol
         self.get_var_fn = getattr(self, get_var_fn_str)
         self.config_check = config_check
@@ -105,13 +104,13 @@ class TaskVariables(enum.Enum):
         return (self.config_check == '' 
                 or gdb.parse_and_eval(self.config_check))
 
-    def get_int_var(self, tcb : gdb.Value):
+    def get_int_var(self, tcb):
         return int(tcb[self.symbol])
 
-    def get_hex_var(self, tcb : gdb.Value):
+    def get_hex_var(self, tcb):
         return hex(int(tcb[self.symbol]))
 
-    def get_string_var(self, tcb : gdb.Value):
+    def get_string_var(self, tcb):
         return tcb[self.symbol].string()
 
 def get_current_tcbs():
@@ -131,7 +130,7 @@ def get_current_tcbs():
     
     return current_tcb_arr
 
-def tasklist_to_rows(tasklist : gdb.Value, state : str, current_tcbs : list[gdb.Value]):
+def tasklist_to_rows(tasklist, state, current_tcbs):
     """Parses a task list into rows that can be displayed.
     
     Parameters
@@ -181,12 +180,12 @@ def get_header():
 
     return headers
 
-def print_table(table : list[list[Any]]):
+def print_table(table):
     """Takes a list of lists and prints it in a formatted table."""
     print (tabulate(table, headers=get_header()))
 
 class FreeRTOSBreakpoint (gdb.Breakpoint):
-    def __init__(self, task_name : str, spec : str):
+    def __init__(self, task_name, spec):
         self.task_name = task_name
         super(FreeRTOSBreakpoint, self).__init__(spec)
 
@@ -204,7 +203,7 @@ class FreeRTOSTaskInfo(gdb.Command):
     def __init__ (self):
         super (FreeRTOSTaskInfo, self).__init__ ("freertos tasks", gdb.COMMAND_USER)
 
-    def invoke (self, arg : str, from_tty : bool):
+    def invoke (self, arg, from_tty):
         table = []
         current_tcbs = get_current_tcbs()
 
@@ -232,7 +231,7 @@ class FreeRTOSCreateBreakpoint(gdb.Command):
     def __init__(self):
         super (FreeRTOSCreateBreakpoint, self).__init__ ("freertos break", gdb.COMMAND_USER)
 
-    def invoke (self, arg : str, from_tty : bool):
+    def invoke (self, arg, from_tty):
         argv = gdb.string_to_argv(arg)
 
         if len(argv) == 0:
