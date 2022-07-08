@@ -47,7 +47,7 @@ class FreeRTOSList():
             yield data
             curr_node = tmp_node['pxNext']
 
-class TaskLists(enum.Enum):
+class TaskList(enum.Enum):
     """All FreeRTOS task lists to scan for tasks from.
     
     Parameters
@@ -71,7 +71,7 @@ class TaskLists(enum.Enum):
         self.symbol = symbol
         self.state = state
 
-class TaskVariables(enum.Enum):
+class TaskVariable(enum.Enum):
     """Variables of TCB_t to display. Refer to FreeRTOS' task.c file for
        more documentation.
 
@@ -100,7 +100,8 @@ class TaskVariables(enum.Enum):
         self.get_var_fn = getattr(self, get_var_fn_str)
         self.config_check = config_check
 
-    def is_valid(self):
+    def is_configured(self):
+        """Checks if the defines enabling this variable are set."""
         return (self.config_check == '' 
                 or gdb.parse_and_eval(self.config_check))
 
