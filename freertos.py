@@ -162,8 +162,8 @@ def tasklist_to_rows(tasklist, state, current_tcbs):
             row.append(current_tcbs.index(task_ptr))
         else:
             row.append('')
-        for tcb_var in TaskVariables:
-            if tcb_var.is_valid():
+        for tcb_var in TaskVariable:
+            if tcb_var.is_configured():
                 row.append(tcb_var.get_var_fn(task_tcb))
         
         rows.append(row)
@@ -175,8 +175,8 @@ def get_header():
 
     headers = ["ID", "STATE", "CPU"]
 
-    for taskvar in TaskVariables:
-        if taskvar.is_valid():
+    for taskvar in TaskVariable:
+        if taskvar.is_configured():
             headers.append(taskvar.name)
 
     return headers
@@ -204,7 +204,7 @@ class FreeRTOSTaskInfo(gdb.Command):
         table = []
         current_tcbs = get_current_tcbs()
 
-        for tasklist in TaskLists:
+        for tasklist in TaskList:
             tasklist_val = gdb.parse_and_eval(tasklist.symbol)
 
             if tasklist_val.type.code == gdb.TYPE_CODE_ARRAY:
