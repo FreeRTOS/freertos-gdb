@@ -1,6 +1,9 @@
 # freertos-gdb
 GDB extension to display FreeRTOS tasks and set task-specific breakpoints.
 
+## Prerequisites
+GDB must be built with Python 2+.
+
 ## Setup
 1. In gdb, use the command ```show data-directory``` to find the path to where GDB searches for auxillary data files. We'll call this ```[data-directory]```.
 2. Copy ```freertos.py``` from this repository into the folder ```[data-directory]/python/gdb/command/```.
